@@ -23,7 +23,7 @@ class Train():
         return False
 
     def __repr__(self):
-        return f"Train with id {self.id}"
+        return f"Train {self.id}"
 
     def __lt__(self, other):
         if other:
@@ -36,7 +36,7 @@ class Train():
         return False
 
     def unload(self, time):
-        print(self.id, "unloaded at time", time)
+        # print(self.id, "unloaded at time", time)
         self.unloaded = True
 
     def hog_out(self, time):
@@ -44,10 +44,12 @@ class Train():
         self.crew = None
         self.hogged_out = True
         self.hog_out_count += 1
+        print(f'TRAIN {self.id} HOGGED', end = ' ')
 
     def new_crew(self, crew, time):
         self.crew = crew
         self.hogged_out = False
+        print(f'TRAIN {self.id} UNHOGGED', end = ' ')
 
     def is_hogged(self):
         return self.hogged_out
@@ -70,6 +72,9 @@ class Crew():
         self.check_out_time = check_out_time
         self.id = Crew.crew_id
         Crew.crew_id += 1
+
+    def __repr__(self):
+        return f"Crew {self.id} checkout time: {self.check_out_time}"
 
     def still_working(self, time):
         # print(time, self.check_out_time)
@@ -118,30 +123,33 @@ class Station():
         if train.is_hogged():
             self.hog_start = time
             self.hogged = True
+            print("|SERVER HOGGED", end = ' ')
 
         self.idle_end = time
         self.busy_start = time
 
         assert self.idle_end >= self.idle_start, f'STATION ENDS BEING IDLE BEFORE BEING IDLE {self.idle_end}, {self.idle_start}'
         # print(f"train {train} entered")
+        # print(f'adding {self.idle_end - self.idle_start} to idle time')
         self.idle_time += self.idle_end - self.idle_start
         self.current_serve = train
 
     def train_hogged(self, train, time):
         # don't care if train is hogged but we are not serving the train
         if train == self.current_serve:
-            print("Train being served and is hogged")
+            # print("Train being served and is hogged", end = '')
             assert not train.get_crew(), f'TRAIN {train.get_id()} IS HOGGED OUT WITH CREW'
 
             self.hog_start = time
             self.hogged = True
+            print("|SERVER HOGGED", end = ' ')
 
     def crew_arrives(self, train, time):
         assert train.get_crew(), f'TRAIN {train.get_id()} HAS NO CREW BUT CREW HAS ARRIVED'
         self.hogged = False
         self.hog_end = time
         assert self.hog_end > self.hog_start, 'HOG OUT ENDS BEFORE STARTING'
-
+        print("|SERVER UNHOGGED", end = '')
         self.hogged_out_time += self.hog_end - self.hog_start
 
 # the queue will contain the order that trains arrived in
@@ -153,12 +161,15 @@ class Queue():
     def add_train(self, train, time):
         self.queue.append(train)
         self.length += 1
+        print(f'|Q = {self.length}', end=' ')
 
     def remove_train(self, train, time):
         assert self.queue[0] == train, f'WRONG TRAIN ({train.get_id()} vs {self.queue[0].get_id()})AT THE FRONT OF QUEUE'
-        print("inside of remove train", self.queue)
+        # print("inside of remove train", self.queue)
         self.queue.pop(0)
-        print("after pop",self.queue)
+        self.length -= 1
+        # print("after pop",self.queue)
+        print(f'|Q = {self.length}', end = ' ')
 
     def next_train(self):
         if len(self.queue) > 0:

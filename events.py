@@ -3,10 +3,12 @@ from objects import Train, Queue, Station, Crew
 import random
 from queue import PriorityQueue
 from scipy.stats import expon
+import sys
+
+# constants
+MAX_ARRIVAL_TIME = 10 ** 1
 
 # operational functions
-
-
 # events that are possible:
 # train arrives to simulation
 # train enters station
@@ -15,8 +17,8 @@ from scipy.stats import expon
 # crew hogs out
 # train gets new crew
 
-def arrival(train):
-    print(f"Train {train} Arrived")
+def arrival(train, file = False):
+    # print(f"Train {train} Arrived")
     global events_queue
     global cur_time
     global q
@@ -26,21 +28,30 @@ def arrival(train):
 
     events_queue.put((cur_time, 'enter_queue', train))
     events_queue.put((train.crew.check_out_time, 'train_hogs', train))
+    print(f"|{train} HOGOUT IN {train.crew.check_out_time - cur_time}h", end = ' ')
 
-    # add next train
-    train_crew_time_left = crew_arrive_gen.random() * 5 + 6
-    next_train_time = train_time_gen.random()
+    if not file:
+        # add next train
+        train_crew_time_left = crew_arrive_gen.random() * 5 + 6
+        next_train_time = train_time_gen.random()
 
-    # exponential distribution
-    expo = expon(scale = 10)
-    inv_cdf = expo.ppf
+        # exponential distribution
+        expo = expon(scale = 10)
+        inv_cdf = expo.ppf
 
-    next_train_time = inv_cdf(next_train_time)
+        next_train_time = inv_cdf(next_train_time)
+
+    else:
+        train_crew_time_left = get_next_crew()
+        next_train_time = get_next_train()
+
     crew_leave_time = train_crew_time_left + cur_time + next_train_time
     new_crew = Crew(crew_leave_time)
     new_train = Train(new_crew)
 
-    events_queue.put((cur_time + next_train_time, 'arrival', new_train))
+    # train does not arrive if past 1 mil
+    if cur_time + next_train_time <= MAX_ARRIVAL_TIME:
+        events_queue.put((cur_time + next_train_time, 'arrival', new_train))
 
     # print("new train added")
     """
@@ -48,7 +59,7 @@ def arrival(train):
     """
 
 def enter_queue(train):
-    print(f"train {train} entered queue")
+    # print(f"train {train} entered queue")
     global events_queue
     global cur_time
     global q
@@ -58,7 +69,7 @@ def enter_queue(train):
     # print(q, q.queue)
 
 def exit_queue(train):
-    print(f"train {train} exited queue")
+    # print(f"train {train} exited queue")
     global events_queue
     global cur_time
     global q
@@ -70,8 +81,8 @@ def exit_queue(train):
     events_queue.put((cur_time, 'enter_station', train))
     station.train_enter(train, cur_time)
 
-def enter_station(train):
-    print(f"train {train} entered station")
+def enter_station(train, file = False):
+    # print(f"train {train} entered station")
     global events_queue
     global cur_time
     global q
@@ -79,15 +90,19 @@ def enter_station(train):
     global unload_time_gen
 
     # time to unload
-    Δt = unload_time_gen.random() + 3.5
-    train.unload(cur_time)
+    if not file:
+        Δt = unload_time_gen.random() + 3.5
+        train.unload(cur_time)
+    else:
+        Δt = get_next_unload()
+    print(f'|UNLOAD {train} {Δt}h', end = ' ')
 
     finish_time = cur_time + Δt
 
     events_queue.put((finish_time, 'exit_station', train))
 
 def exit_station(train):
-    print(f"train {train} exited station")
+    # print(f"train {train} exited station")
     global events_queue
     global cur_time
     global q
@@ -95,29 +110,35 @@ def exit_station(train):
     station.train_served(train, cur_time)
 
     #get next train in queue
-    print(q, q.queue)
+    # print(q, q.queue)
     next_train = q.next_train()
-    print(next_train)
+    # print(next_train)
     if next_train:
         events_queue.put((cur_time, 'exit_queue', next_train))
     events_queue.put((cur_time+.0000000001, 'leave', train))
 
+# gathers all of the train data
+# then deletes the train
 def leave(train):
-    print(f"train {train} left")
+    global times_hogged
+    # print(f"train {train} left")
+    times_hogged.append(train.hog_out_count)
     del train
 
-def train_hogs(train):
-    print(f"train {train} hogged")
+def train_hogs(train, file = False):
+    # print(f"train {train} hogged")
     global events_queue
     global cur_time
     global q
     global station
     global crew_arrive_gen
 
-
     if not train.is_unloaded():
         # gen next crew
-        new_crew_arrival = crew_arrive_gen.random() * 1 + 2.5
+        if not file:
+            new_crew_arrival = crew_arrive_gen.random() * 1 + 2.5
+        else:
+            new_crew_arrival = get_next_crew_arrive()
         new_crew = Crew(cur_time + 12)
 
         train.hog_out(cur_time)
@@ -129,6 +150,7 @@ def train_hogs(train):
         # there would be easier way to do this if I implemented my own PriorityQ
         # but I got lazy just in case editing the queue screws somethign up
         # I will just dump out the queue and re-add all the events
+
         while not events_queue.empty():
             next_item = events_queue.get()
             # if train is hogged, the actions taken must take
@@ -143,12 +165,14 @@ def train_hogs(train):
 
         for event in events:
             events_queue.put(event)
-
         # make sure that the only event that has 3 arguments is unhogging
         events_queue.put((new_crew_arrival + cur_time, 'train_unhog', train, new_crew))
 
+    else:
+        print("|MEANINGLESS HOG", end = ' ')
+
 def train_unhog(train, crew):
-    print(f"train {train} unhogged")
+    # print(f"train {train} unhogged")
     global events_queue
     global cur_time
     global q
@@ -165,7 +189,9 @@ def main():
     global train_time_gen
     global crew_arrive_gen
     global unload_time_gen
+    global times_hogged
 
+    times_hogged = []
     events_queue = PriorityQueue()
     cur_time = 0
     q = Queue()
@@ -211,19 +237,27 @@ def main():
     while not events_queue.empty():
         action = events_queue.get()
         if len(action) == 3: # everythign except train unhog
-            print(action)
+            # print(action)
             cur_time, event, train = action
+            print(f"Time {cur_time}: {event} {train}", end = ' ')
             connections[event](train)
-            if not station.current_serve and event == enter_queue:
-                events_queue.put((cur_time + .000000000000000001, 'exit_queue', train))
+            if not station.current_serve and event == 'enter_queue':
+                events_queue.put((cur_time, 'exit_queue', train))
+
         elif len(action) == 4: # train unhog
             cur_time, event, train, crew = action
+            print(f"Time {cur_time}: {event} {train} {crew}", end = ' ')
             connections[event](train, crew)
-        if cur_time > 10**8:
-            break
-        print(f"simulated to time {cur_time}, {events_queue.queue} \n")
-    print(events_queue)
+
+        print()
+
+    #gather data from station
+    print(f'Station data: \n\tidle time: {station.idle_time}\n\tbusy time: \
+        {station.busy_time}\n\thogged time: {station.hogged_out_time}\n\ttrains served: \
+        {station.num_trains_served}')
+
 
 if __name__ == '__main__':
-    print('here')
+    # print(sys.argv)
+    MAX_ARRIVAL_TIME = int(sys.argv[1]) * float(sys.argv[2])
     main()
