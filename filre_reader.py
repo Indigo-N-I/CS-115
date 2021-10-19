@@ -8,17 +8,22 @@ class FileReader():
         self.new_crew_times = []
 
     def _read_train_file(self):
-        for line in self.in_file_train:
-            try:
-                train, unload, crew = line.split(' ')
-                self.train_times.append(float(train))
-                self.unloading_times.append(float(unload))
-                self.crew_times.append(float(crew))
-            except:
-                self.in_file_train.close()
-                return False
-            break
-        return True
+        print(self.in_file_train.closed)
+        if not self.in_file_train.closed:
+            for line in self.in_file_train:
+                try:
+                    print("trying")
+                    train, unload, crew = line.split(' ')
+                    self.train_times.append(float(train))
+                    self.unloading_times.append(float(unload))
+                    self.crew_times.append(float(crew))
+                except:
+                    self.in_file_train.close()
+                    print("In HERE HI", self.in_file_train.closed)
+                    return False
+                break
+            return len(self.train_times) > 0
+        return False
 
     def get_next_train(self):
         if len(self.train_times)> 0:
@@ -30,8 +35,8 @@ class FileReader():
                 return None
 
     def get_next_unload(self):
-        if len(self.unload_times)> 0:
-            return self.unload_times.pop(0)
+        if len(self.unloading_times)> 0:
+            return self.unloading_times.pop(0)
         else:
             if self._read_train_file():
                 return self.get_next_unload()

@@ -50,8 +50,7 @@ def arrival(train, file = FILE):
     events_queue.put((train.crew.check_out_time, 'train_hogs', train))
     assert train.crew.check_out_time - cur_time > 6, 'CREW DOES NOT STAY FOR LONG ENOUGH'
     print(f"|{train} HOGOUT IN {train.crew.check_out_time - cur_time}h", end = ' ')
-
-    if not file:
+    if not FILE:
         # add next train
         train_crew_time_left = crew_arrive_gen.random() * 5 + 6
         next_train_time = train_time_gen.random()
@@ -75,12 +74,13 @@ def arrival(train, file = FILE):
     else:
         train_crew_time_left = get_next_crew()
         next_train_time = get_next_train()
+        print("IN HERE")
 
         if next_train_time:
             crew_leave_time = train_crew_time_left + next_train_time
             new_crew = Crew(crew_leave_time)
             new_train = Train(new_crew)
-            events_queue.put((cur_time + next_train_time, 'arrival', new_train))
+            events_queue.put((next_train_time, 'arrival', new_train))
 
 
     # print("new train added")
@@ -120,7 +120,7 @@ def enter_station(train, file = FILE):
     global unload_time_gen
 
     # time to unload
-    if not file:
+    if not FILE:
         Δt = unload_time_gen.random() + 3.5
     else:
         Δt = get_next_unload()
@@ -174,7 +174,7 @@ def train_hogs(train, file = FILE):
 
     if not train.is_unloaded():
         # gen next crew
-        if not file:
+        if not FILE:
             new_crew_arrival = crew_arrive_gen.random() * 1 + 2.5
         else:
             new_crew_arrival = get_next_crew_arrive()
@@ -249,13 +249,27 @@ def main():
     # add arrival of train to event queue
         # creates a new train in the queue
     # add exit queue for first train to event_queue
+    if not FILE:
+        train_crew_time_left = crew_arrive_gen.random() * 5 + 6
+        crew_leave_time = train_crew_time_left + cur_time
+        new_crew = Crew(crew_leave_time)
+        new_train = Train(new_crew)
 
-    train_crew_time_left = crew_arrive_gen.random() * 5 + 6
-    crew_leave_time = train_crew_time_left + cur_time
-    new_crew = Crew(crew_leave_time)
-    new_train = Train(new_crew)
+        events_queue.put((cur_time, 'arrival', new_train))
 
-    events_queue.put((cur_time, 'arrival', new_train))
+    # if a file is not give, the first train will be randomlly created
+    # if a file is givne, the first train will be taken from the file
+    else:
+        train_crew_time_left = get_next_crew()
+        next_train_time = get_next_train()
+        # print("IN HERE")
+
+        if next_train_time:
+            crew_leave_time = train_crew_time_left + next_train_time
+            new_crew = Crew(crew_leave_time)
+            new_train = Train(new_crew)
+            events_queue.put((next_train_time, 'arrival', new_train))
+
     # events_queue.put((cur_time + .000000000000000001, exit_queue, new_train))
 
     # loop while event queue has events:
@@ -294,6 +308,7 @@ def main():
             connections[event](train, crew)
         prev_time = cur_time
         print()
+        print(events_queue.queue)
 
     #gather data from station
     print(f'Station data: \n\tidle time: \
