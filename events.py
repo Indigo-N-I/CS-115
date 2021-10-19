@@ -3,9 +3,10 @@ from objects import Train, Queue, Station, Crew
 from filre_reader import FileReader
 import random
 from queue import PriorityQueue
-from scipy.stats import expon
+import math
+# from scipy.stats import expon
 import sys
-import numpy as np
+# import numpy as np
 from collections import defaultdict
 
 # constants
@@ -28,6 +29,8 @@ def get_next_crew_arrive():
     assert type(FILE) == FileReader, "FILE NOT CREATED PROPERLY"
     return FILE.get_next_crew_arrive()
 
+def inv_cdf(num):
+    return -math.log(1-num)
 # operational functions
 # events that are possible:
 # train arrives to simulation
@@ -56,9 +59,6 @@ def arrival(train, file = FILE):
         next_train_time = train_time_gen.random()
 
         # exponential distribution
-        expo = expon(scale = INTER_ARRIVAL)
-        inv_cdf = expo.ppf
-
         next_train_time = inv_cdf(next_train_time)
         crew_leave_time = train_crew_time_left + cur_time + next_train_time
         new_crew = Crew(crew_leave_time)
@@ -319,8 +319,8 @@ def main():
 
     # data from trains
     print(f'Train Data: \n\tAverage In System Time: \
-        {np.average(in_sys_time)}\n\tMax In System time: \
-        {np.max(in_sys_time)} \n\tHistogram:')
+        {sum(in_sys_time)/len(in_sys_time)}\n\tMax In System time: \
+        {max(in_sys_time)} \n\tHistogram:')
 
     for key in sorted([i for i in times_hogged.keys()]):
         print("\t", key,":", times_hogged[key])

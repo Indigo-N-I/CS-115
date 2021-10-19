@@ -12,14 +12,14 @@ class FileReader():
         if not self.in_file_train.closed:
             for line in self.in_file_train:
                 try:
-                    print("trying")
+                    # print("trying")
                     train, unload, crew = line.split(' ')
                     self.train_times.append(float(train))
                     self.unloading_times.append(float(unload))
                     self.crew_times.append(float(crew))
                 except:
                     self.in_file_train.close()
-                    print("In HERE HI", self.in_file_train.closed)
+                    # print("In HERE HI", self.in_file_train.closed)
                     return False
                 break
             return len(self.train_times) > 0
