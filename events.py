@@ -29,8 +29,10 @@ def get_next_crew_arrive():
     assert type(FILE) == FileReader, "FILE NOT CREATED PROPERLY"
     return FILE.get_next_crew_arrive()
 
+# inverse cdf to calculate next train arrival
 def inv_cdf(num):
-    return -math.log(1-num)
+    return -math.log(1-num) * INTER_ARRIVAL
+
 # operational functions
 # events that are possible:
 # train arrives to simulation
@@ -39,6 +41,10 @@ def inv_cdf(num):
 # train exits station
 # crew hogs out
 # train gets new crew
+
+# arriving generates the next train
+# adds event train's hog out time
+# adds event add train to queue
 def arrival(train, file = FILE):
     # print(f"Train {train} Arrived")
     global events_queue
@@ -88,6 +94,7 @@ def arrival(train, file = FILE):
     events_queue.put((cur_time + time, arrival, train))
     """
 
+# adds train to q
 def enter_queue(train):
     # print(f"train {train} entered queue")
     global events_queue
@@ -98,6 +105,7 @@ def enter_queue(train):
 
     # print(q, q.queue)
 
+# train exits q and enters station
 def exit_queue(train):
     # print(f"train {train} exited queue")
     global events_queue
@@ -111,6 +119,7 @@ def exit_queue(train):
     events_queue.put((cur_time, 'enter_station', train))
     station.train_enter(train, cur_time)
 
+# entering station and queue's up unloading
 def enter_station(train, file = FILE):
     # print(f"train {train} entered station")
     global events_queue
@@ -130,11 +139,13 @@ def enter_station(train, file = FILE):
 
     events_queue.put((finish_time, 'finish_unload', train))
 
+# unloads train at moment and queues exit station at same time
 def finish_unload(train):
     print(f'|UNLOAD {train} at time {cur_time}', end=' ')
     train.unload(cur_time)
     events_queue.put((cur_time, 'exit_station', train))
 
+# exit station and queue leave sim at same time
 def exit_station(train):
     # print(f"train {train} exited station")
     global events_queue
@@ -164,6 +175,7 @@ def leave(train):
     times_hogged[train.hog_out_count] += 1
     del train
 
+# train hogging pushes back when train's actions happen
 def train_hogs(train, file = FILE):
     # print(f"train {train} hogged")
     global events_queue
@@ -194,7 +206,11 @@ def train_hogs(train, file = FILE):
             next_item = events_queue.get()
             # if train is hogged, the actions taken must take
             # additional time equal to how long it takes crew to get to train
-            # if a train is hogged, it won't effect other trains getting hogged/unhogged
+            # if a train is hogged, it won't effect other trains getting hogged/unhogged or arrival time
+            # other timings are instantanious
+            # should never impact the train unloading time because train taht is unloading will always be
+            # a lower id number than one being hogged unless the one being hogged is the one unloading
+            # in which case it does get pushed back
             if (next_item[2] > train or next_item[2] == train) and (next_item[1] != 'train_hogs'\
                 and next_item[1] != 'train_unhog' and next_item[1] != 'arrival'):
                 changed_item = (next_item[0] + new_crew_arrival, next_item[1], next_item[2])
@@ -210,6 +226,7 @@ def train_hogs(train, file = FILE):
     else:
         print("|MEANINGLESS HOG", end = ' ')
 
+# simply unhogs the train
 def train_unhog(train, crew):
     # print(f"train {train} unhogged")
     global events_queue
@@ -308,26 +325,27 @@ def main():
             connections[event](train, crew)
         prev_time = cur_time
         print()
-        print(events_queue.queue)
+        # print(events_queue.queue)
 
     #gather data from station
-    print(f'Station data: \n\tidle time: \
-        {station.idle_time / station.get_up_time()}\n\tbusy time: \
-        {station.busy_time/ station.get_up_time()}\n\thogged time: \
-        {station.hogged_out_time/ station.get_up_time()}\n\ttrains served: \
+    print("Statistics:")
+    print(f'Station data: \n\tDock idle percentage: \
+        {station.idle_time / station.get_up_time()*100}%\n\tDock busy percentage: \
+        {station.busy_time/ station.get_up_time()*100}%\n\tDock hogged-out percentage: \
+        {station.hogged_out_time/ station.get_up_time()*100}%\n\tTotal number of trains served: \
         {station.num_trains_served}')
 
     # data from trains
-    print(f'Train Data: \n\tAverage In System Time: \
-        {sum(in_sys_time)/len(in_sys_time)}\n\tMax In System time: \
-        {max(in_sys_time)} \n\tHistogram:')
+    print(f'Train Data: \n\tAverage time-in-system per train: \
+        {sum(in_sys_time)/len(in_sys_time)}h\n\tMaximum time-in-system per train: \
+        {max(in_sys_time)}h \n\tHistogram of hogout count per train:')
 
     for key in sorted([i for i in times_hogged.keys()]):
-        print("\t", key,":", times_hogged[key])
+        print(f"\t[{key}]: {times_hogged[key]}")
 
     # data from queue
-    print(f'Queue Data: \n\tMax Queue Length: \
-        {q.get_max_len()}\n\tAverage Queue Length: \
+    print(f'Queue Data: \n\tMaximum number of trains in queue: \
+        {q.get_max_len()}\n\tTime average number of trains in queue: \
         {q.get_avg_len()}')
 
 

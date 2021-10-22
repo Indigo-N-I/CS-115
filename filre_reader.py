@@ -7,6 +7,9 @@ class FileReader():
         self.unloading_times = []
         self.new_crew_times = []
 
+    # to read the train in file
+    # and checks if there are more trains that need to be read in
+    # does it line by line so that no extra memory is used by saving unessiary data
     def _read_train_file(self):
         print(self.in_file_train.closed)
         if not self.in_file_train.closed:
@@ -25,6 +28,10 @@ class FileReader():
             return len(self.train_times) > 0
         return False
 
+    # following four are of same idea
+    # check if the array for the data has items in it
+    # if it does, returns and removes item
+    # if it does not, tries to read the next line of the file that has the info
     def get_next_train(self):
         if len(self.train_times)> 0:
             return self.train_times.pop(0)

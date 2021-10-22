@@ -18,6 +18,7 @@ class Train():
         self.unloaded = False
         self.in_time = self.out_time = 0
 
+    # test how to know when trains are the same
     def __eq__(self, other):
         if other:
             return self.id == other.id
@@ -26,6 +27,7 @@ class Train():
     def __repr__(self):
         return f"Train {self.id}"
 
+    # used for compairing when trains arrived
     def __lt__(self, other):
         if other:
             return self.id < other.id
@@ -36,6 +38,7 @@ class Train():
             return self.id > other.id
         return False
 
+    # intime and out time of the system
     def set_intime(self, time):
         self.in_time = time
 
@@ -45,8 +48,8 @@ class Train():
     def get_insys_time(self):
         return self.out_time - self.in_time
 
+    # time in unessicary but put in in case we want other features
     def unload(self, time):
-        # print(self.id, "unloaded at time", time)
         self.unloaded = True
 
     def hog_out(self, time):
@@ -56,6 +59,7 @@ class Train():
         self.hog_out_count += 1
         print(f'TRAIN {self.id} HOGGED', end = ' ')
 
+    # stops hog out and gets new crew
     def new_crew(self, crew, time):
         self.crew = crew
         self.hogged_out = False
@@ -86,6 +90,8 @@ class Crew():
     def __repr__(self):
         return f"Crew {self.id} checkout time: {self.check_out_time}"
 
+    # sanity check method, to see if crew is still working at said time
+    # or if crew is hogged out
     def still_working(self, time):
         # print(time, self.check_out_time)
         if time >= self.check_out_time:
@@ -112,6 +118,9 @@ class Station():
         # sanity check
         self.hogged = False
 
+    # ends serving the train
+    # ends being busy
+    # starts being idle
     def train_served(self, train, time):
         assert self.current_serve, "TRAIN ENDING SERVICE WITHOUT TRAIN IN STATION"
         assert train.is_unloaded(), f"TRAIN {train.get_id()} LEAVING STATION LOADED"
@@ -127,6 +136,9 @@ class Station():
         self.current_serve = None
         self.end_time = time
 
+    # starts serving the train
+    # ends being idle
+    # starts being busy
     def train_enter(self, train, time):
         assert not train.is_unloaded(), f"TRAIN {train.get_id()} ENTERING STATION UNLOADED"
         assert not self.current_serve, "TRAIN STARTING SERVICE WITH DIFFERENT TRAIN IN STATION"
@@ -146,6 +158,8 @@ class Station():
         self.idle_time += self.idle_end - self.idle_start
         self.current_serve = train
 
+    # tries checks to see if the train being helped is hogged
+    # does not do anything if it is not the train being helped that is hogged
     def train_hogged(self, train, time):
         # don't care if train is hogged but we are not serving the train
         if train == self.current_serve:
@@ -157,6 +171,8 @@ class Station():
             self.hogged = True
             print("|SERVER HOGGED", end = ' ')
 
+    # checks for unhogging for current train
+    # does nothing if thee train unhogged is not being served
     def crew_arrives(self, train, time):
         assert train.get_crew(), f'TRAIN {train.get_id()} HAS NO CREW BUT CREW HAS ARRIVED'
         if train == self.current_serve:
@@ -173,6 +189,8 @@ class Station():
 
 # the queue will contain the order that trains arrived in
 class Queue():
+    # total train time can be caluclated by doing
+    # Σ(train departure time) - Σ(train arrival times)
     def __init__(self):
         self.queue = []
         self.length = 0
@@ -183,6 +201,8 @@ class Queue():
     def add_train(self, train, time):
         self.queue.append(train)
         self.length += 1
+
+        # saving max queue length
         print(f'|Q = {self.length}', end=' ')
         if self.length > self.max_len:
             self.max_len = self.length
@@ -193,7 +213,7 @@ class Queue():
         # print("inside of remove train", self.queue)
         self.queue.pop(0)
         self.length -= 1
-        # print("after pop",self.queue)
+
         print(f'|Q = {self.length}', end = ' ')
         self.total_train_time += time
         self.total_time = time
