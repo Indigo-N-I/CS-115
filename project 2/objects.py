@@ -37,8 +37,8 @@ class Train(object):
 
             print(f"train {self.id} got to dock at {self.env.now}" )
             # print(f"req after satisfy {req}")
-
-            unload = self.env.process(self.unload(4, 0))
+            unload_time = RAND_NUM.random()* 1 + 4.5
+            unload = self.env.process(self.unload(unload_time, 0))
             while not unload.triggered:
                 unload_start = self.env.now
                 yield unload | hog_out
@@ -49,7 +49,7 @@ class Train(object):
                     hog_out = self.env.timeout(12)
                     yield self.env.timeout(arrival_time)
                     print(f"train {self.id} unhogs at {self.env.now}")
-                    unload = self.env.process(self.unload(4, time_passed))
+                    unload = self.env.process(self.unload(unload_time, time_passed))
 
             return
 
@@ -57,36 +57,24 @@ class Train(object):
         print(f"unloading starting at {self.env.now} for train {self.id} for {unload_time - already_spent}h")
         try:
             yield self.env.timeout(unload_time - already_spent)
-            print(f"unload successful for train {self.id}")
+            print(f"unload successful for train {self.id} at time {self.env.now}")
         except simpy.Interrupt as i:
             print(f"unload interupted at {self.env.now} due to hogout")
         except Exception as e:
             print("other exception happened", e)
 
 
-class Crew(object):
-    ID = 0
-    def __init__(self, env, train):
-        self.env = env
-        self.action = env.process(self.run())
-        self.id = Crew.ID
-        Crew.ID += 1
-        self.train = train
+class Dock(simpy.Resource):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.data = []
 
-    def run(self):
-        print('here')
-        while True:
-            # no random for now
-            yield self.env.process(self.work_time())
+    def request(self, *args, **kwargs):
+        self.data.append((self._env.now, len(self.queue)))
+        # print("requested")
+        return super().request(*args, **kwargs)
 
-    def work_time(self):
-        # print("here")
-        b = self.arrival_time()
-
-        yield self.env.timeout(b)
-        print(f"Crew {self.id} arrives to train at {self.env.now}")
-        yield self.env.timeout(12 - b)
-        print(f"Crew {self.id} hoggs out at {self.env.now}")
-
-    def arrival_time(self):
-        return 1
+    def release(self, *args, **kwargs):
+        self.data.append((self._env.now, len(self.queue)))
+        # print("released")
+        return super().release(*args, **kwargs)
