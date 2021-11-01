@@ -5,11 +5,12 @@ from functools import partial, wraps
 env = simpy.Environment()
 dock = Dock(env, capacity=1)
 
+
 def monitor(data, resource):
     item = (
-    resource._env.now,  # The current simulation time
-    resource.count,  # The number of users
-    len(resource.queue),  # The number of queued processes
+        resource._env.now,  # The current simulation time
+        resource.count,  # The number of users
+        len(resource.queue),  # The number of queued processes
     )
     if item[2] > data['Max Queue']:
         data['Max Queue'] = item[2]
@@ -34,53 +35,58 @@ def monitor(data, resource):
 
     data["Prev data"] = item
     data['total time'] = item[0]
-    data['total data'].append(item)
-    
+    # data['total data'].append(item)
+
+
 def patch_resource(resource, pre=None, post=None):
-     """Patch *resource* so that it calls the callable *pre* before each
-     put/get/request/release operation and the callable *post* after each
-     operation.  The only argument to these functions is the resource
-     instance.
+    """Patch *resource* so that it calls the callable *pre* before each
+    put/get/request/release operation and the callable *post* after each
+    operation.  The only argument to these functions is the resource
+    instance.
 
-     """
-     def get_wrapper(func):
-         # Generate a wrapper for put/get/request/release
-         @wraps(func)
-         def wrapper(*args, **kwargs):
-             # This is the actual wrapper
-             # Call "pre" callback
-             if pre:
-                 pre(resource)
+    """
 
-             # Perform actual operation
-             ret = func(*args, **kwargs)
+    def get_wrapper(func):
+        # Generate a wrapper for put/get/request/release
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # This is the actual wrapper
+            # Call "pre" callback
+            if pre:
+                pre(resource)
 
-             # Call "post" callback
-             if post:
-                 post(resource)
+            # Perform actual operation
+            ret = func(*args, **kwargs)
 
-             return ret
-         return wrapper
+            # Call "post" callback
+            if post:
+                post(resource)
 
-     # Replace the original operations with our wrapper
-     for name in ['put', 'get', 'request', 'release']:
-         if hasattr(resource, name):
-             setattr(resource, name, get_wrapper(getattr(resource, name)))
+            return ret
 
+        return wrapper
+
+    # Replace the original operations with our wrapper
+    for name in ['put', 'get', 'request', 'release']:
+        if hasattr(resource, name):
+            setattr(resource, name, get_wrapper(getattr(resource, name)))
 
 
 a = Train(env, dock, 0)
 
-data = {"Max Queue":0,
+data = {"Max Queue": 0,
         "Total Length": 0,
         "Busy Time": 0,
         "Idle Time": 0,
-        "Prev data": (0,0,0),
+        "Prev data": (0, 0, 0),
         "total time": 0,
-        "total data": [(0,0,0)]}
+        "total data": [(0, 0, 0)]}
 monitor = partial(monitor, data)
-patch_resource(dock, post = monitor)
-
-env.run(until = 100000)
+patch_resource(dock, post=monitor)
+# a = env.timeout(2)
+# print(a)
+env.run(until=10000000)
 print(data)
-print(dock.length_data/dock.total_time, dock.total_time)
+print(data['Busy Time']/data["total time"])
+print(dock.length_data / dock.total_time, dock.total_time)
+print(Train.AVG_TIME_IN_SYSTEM, Train.MAX_TIME_IN_SYSTEM, Train.HOG_OUT_COUNT.count(0), Train.HOG_OUT_COUNT.count(1), Train.HOG_OUT_COUNT.count(2))
