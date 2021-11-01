@@ -18,7 +18,9 @@ class Train(object):
     MAX_TIME_IN_SYSTEM = 0
     AVG_TIME_IN_SYSTEM = 0
     HOG_OUT_COUNT = []
+    HOG_OUT_TIME = 0
     # HOG_OUT_TIME = 0
+    # Prev_in_dock = -1
     def __init__(self, env, dock, start_time):
         self.env = env
         self.action = env.process(self.run())
@@ -30,13 +32,14 @@ class Train(object):
         self.exit_time = start_time
         Train.ID += 1
         self.hog_outs = 0
+        self.hog_out_time = 0
         # print(f"train {self.id} created")
         # print(f"Current time at creation is {env.now}")
 
     def run(self):
         next_train_time = -math.log(1-NEXT_TRAIN_NUM.random()) * 10
         # yield self.env.process(next_train.run())
-        if not self.start_time + next_train_time > 100000:
+        if not self.start_time + next_train_time > 1000000:
             next_train = Train(self.env, self.dock, self.start_time + next_train_time)
         yield self.env.timeout(self.start_time)
         print(f"train {self.id} in system at time {self.env.now}")
@@ -57,8 +60,10 @@ class Train(object):
                     hog_out = self.env.timeout(12)
                     yield self.env.timeout(arrival_time)
                     print(f"train {self.id} unhogs at {self.env.now}")
-
-
+                    if self.dock.is_avalible():
+                        self.hog_out_time += self.env.now - self.dock.get_avalible()
+            # assert Train.Prev_in_dock == self.id-1, "Trains went out of order"
+            # Train.Prev_in_dock = self.id
             print(f"train {self.id} got to dock at {self.env.now}" )
             # print(f"req after satisfy {req}")
             unload_time = self.unload_time
@@ -71,6 +76,7 @@ class Train(object):
                     print(f"train {self.id} hogged out at time {self.env.now}")
                     time_passed = -(unload_start - self.env.now)
                     arrival_time = ARRIVAL_NUM.random() * 1 + 2.5
+                    self.hog_out_time += arrival_time
                     hog_out = self.env.timeout(12)
                     yield self.env.timeout(arrival_time)
                     print(f"train {self.id} unhogs at {self.env.now}")
@@ -80,6 +86,7 @@ class Train(object):
                 Train.MAX_TIME_IN_SYSTEM = self.exit_time - self.start_time
             Train.AVG_TIME_IN_SYSTEM += (self.exit_time - self.start_time) / Train.ID
             Train.HOG_OUT_COUNT.append(self.hog_outs)
+            Train.HOG_OUT_TIME += self.hog_out_time
             return
 
     def unload(self, unload_time, already_spent = 0):
@@ -102,12 +109,15 @@ class Dock(simpy.Resource):
         self.released = 0
         self.total_time = 0
         self.prev_time = 0
+        # self.prev_train = 0
+        self.avil_time = -1
 
     def request(self, *args, **kwargs):
         self.data.append((self._env.now, len(self.queue)))
         print("requested")
         self.length_data -= self._env.now
         self.req += 1
+        # print(self.queue)
         # assert self.prev_time < self._env.now, " Time went backwards"
         self.total_time = self._env.now
         return super().request(*args, **kwargs)
@@ -116,8 +126,17 @@ class Dock(simpy.Resource):
         self.total_time = self._env.now
         self.data.append((self._env.now, len(self.queue)))
         print("released")
-        print(len(self.queue))
+        # print(len(self.queue))
+        if len(self.users) == 0:
+            self.avil_time = self._env.now
+        # print(self.queue)
         # assert self.prev_time < self._env.now, " Time went backwards"
         self.length_data += self._env.now
         self.released += 1
         return super().release(*args, **kwargs)
+
+    def get_avalible(self):
+        return self.avil_time
+
+    def is_avalible(self):
+        return (len(self.users) == 0)
