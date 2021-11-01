@@ -2,10 +2,7 @@ import simpy
 from objects import Train, Dock
 from functools import partial, wraps
 
-env = simpy.Environment()
-dock = Dock(env, capacity=1)
-
-
+# monitor is edited from simpy's examples
 def monitor(data, resource):
     item = (
         resource._env.now,  # The current simulation time
@@ -14,30 +11,23 @@ def monitor(data, resource):
     )
     if item[2] > data['Max Queue']:
         data['Max Queue'] = item[2]
-    print(item)
+    # print(item)
     # # either there is a user currently using or user in queue
-    # if (item[1] > 0 or item[2] > 0) and not (data['Prev data'][1] > 0 or data['Prev data'][2] > 0):
-    #     print(f"busy at time {item[0]}")
-    #     data['Busy Time'] -= item[0]
     # # no one in queue and not in use
+
+    # there is no one in the queue and no one waiting in the queue
     if item[1] == 0 and item[2] == 0:
         data['Busy Time'] += item[0]
         print(f"no longer busy at time {item[0]}, total busy time {data['Busy Time']}")
+    # in the previous state, there was no one waiting for or at the dock
     elif data['Prev data'][1] == data['Prev data'][2] == 0:
         print(f"busy at time {item[0]}")
         data['Busy Time'] -= item[0]
 
-    # if the queue incrases in length
-    # if item[2] > data['Prev data'][2]:
-    #     data["Total Length"] -= item[0]
-    # elif item[2] < data['Prev data'][2]:
-    #     data['Total Length'] += item[0]
-
     data["Prev data"] = item
     data['total time'] = item[0]
-    # data['total data'].append(item)
 
-
+# patch resource also copied from simpy's example
 def patch_resource(resource, pre=None, post=None):
     """Patch *resource* so that it calls the callable *pre* before each
     put/get/request/release operation and the callable *post* after each
@@ -71,7 +61,8 @@ def patch_resource(resource, pre=None, post=None):
         if hasattr(resource, name):
             setattr(resource, name, get_wrapper(getattr(resource, name)))
 
-
+env = simpy.Environment()
+dock = Dock(env, capacity=1)
 a = Train(env, dock, 0)
 
 data = {"Max Queue": 0,
@@ -83,8 +74,7 @@ data = {"Max Queue": 0,
         "total data": [(0, 0, 0)]}
 monitor = partial(monitor, data)
 patch_resource(dock, post=monitor)
-# a = env.timeout(2)
-# print(a)
+
 env.run(until=10000000)
 print(data)
 print(data['Busy Time']/data["total time"])
