@@ -142,15 +142,3 @@ if __name__ == "__main__":
         data_list['Max Time In System'].append(max_time_in_system)
         data_list['Histogram'].append(histogram)
         data_list["Hog Out Percent"].append(hog_out_time)
-        if l%10 == 0:
-            print(f"Finished {l +1} runs")
-        # data_list.append((data,data['Busy Time']/data["total time"],dock.length_data / dock.total_time, dock.total_time,
-        #                   Train.AVG_TIME_IN_SYSTEM, Train.MAX_TIME_IN_SYSTEM, Train.HOG_OUT_COUNT.count(0),
-        #                   Train.HOG_OUT_COUNT.count(1), Train.HOG_OUT_COUNT.count(2), Train.HOG_OUT_TIME/dock.total_time))
-        inter_train_time = data_list['Avg Wait Time']
-        mean, low, high = calc_CI(inter_train_time)
-        if (high - low) / mean < .01:
-            print(f"It took {l+1} runs to get to 1% width 99% Confidence Interval")
-            print(f"The CI is ({low}, {high})")
-            break
-        # print(low, high)
