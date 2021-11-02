@@ -1,7 +1,17 @@
 import simpy
-from objects import Train, Dock
+from objects import Train, Dock, reset_random
+from filre_reader import FileReader
 from functools import partial, wraps
+from collections import defaultdict
+import sys
+import numpy as np
+import scipy.stats
 
+
+
+FILE = False
+MAX_ARRIVAL_TIME = 1000000
+INTER_ARRIVAL = 10
 # monitor is edited from simpy's examples
 def monitor(data, resource):
     item = (
@@ -61,23 +71,86 @@ def patch_resource(resource, pre=None, post=None):
         if hasattr(resource, name):
             setattr(resource, name, get_wrapper(getattr(resource, name)))
 
-env = simpy.Environment()
-dock = Dock(env, capacity=1)
-a = Train(env, dock, 0)
+# confidence interval calculation from stock overflow
+def calc_CI(data, confidence=0.99):
+    a = 1.0 * np.array(data)
+    n = len(a)
+    m, se = np.mean(a), scipy.stats.sem(a)
+    h = se * scipy.stats.t.ppf((1 + confidence) / 2., n-1)
+    return m, m-h, m+h
 
-data = {"Max Queue": 0,
-        "Total Length": 0,
-        "Busy Time": 0,
-        "Idle Time": 0,
-        "Prev data": (0, 0, 0),
-        "total time": 0,
-        "total data": [(0, 0, 0)]}
-monitor = partial(monitor, data)
-patch_resource(dock, post=monitor)
+if __name__ == "__main__":
 
-env.run(until=10000000)
-print(data)
-print(data['Busy Time']/data["total time"])
-print(dock.length_data / dock.total_time, dock.total_time)
-print(Train.AVG_TIME_IN_SYSTEM, Train.MAX_TIME_IN_SYSTEM, Train.HOG_OUT_COUNT.count(0), Train.HOG_OUT_COUNT.count(1), Train.HOG_OUT_COUNT.count(2))
-print(Train.HOG_OUT_TIME/dock.total_time)
+    if sys.argv[1] != '-s':
+        MAX_ARRIVAL_TIME = float(sys.argv[2])
+        INTER_ARRIVAL = float(sys.argv[1])
+        try:
+            LOOPS = int(sys.argv[3])
+        except IndexError as e:
+            print("Only one loop requested")
+            LOOPS = 1
+        FILE = False
+        start_time = 0
+    else:
+        # print('HERE')
+        # assert False, 'GOT INTO THE ELSE STATMENT'
+        train_times = sys.argv[2]
+        crew_times = sys.argv[3]
+        FILE = FileReader(train_times, crew_times)
+        start_time = FILE.get_next_train()
+
+    data_list = defaultdict(list)
+
+    for l in range(LOOPS):
+        Train.reset()
+        reset_random(l + 1)
+        env = simpy.Environment()
+        dock = Dock(env, capacity=1)
+        a = Train(env, dock, start_time)
+        Train.set_info(FILE, MAX_ARRIVAL_TIME, INTER_ARRIVAL)
+
+        data = {"Max Queue": 0,
+                "Total Length": 0,
+                "Busy Time": 0,
+                "Idle Time": 0,
+                "Prev data": (0, 0, 0),
+                "total time": 0,
+                "total data": [(0, 0, 0)]}
+        monitor_1 = partial(monitor, data)
+        patch_resource(dock, post=monitor_1)
+
+        # *2 so that all trains are able to leave
+        env.run(until=MAX_ARRIVAL_TIME*2)
+        busy_percent = data['Busy Time']/data["total time"]
+        idle_percent = 1 - busy_percent
+        max_length = data['Max Queue']
+        avg_length = dock.length_data / dock.total_time
+        avg_wait_time = Train.AVG_TIME_IN_SYSTEM
+        max_time_in_system = Train.MAX_TIME_IN_SYSTEM
+        histogram = Train.HOG_OUT_COUNT
+        hog_out_time = Train.HOG_OUT_TIME/dock.total_time
+        # print(data)
+        # print(data['Busy Time']/data["total time"])
+        # print(dock.length_data / dock.total_time, dock.total_time)
+        # print(Train.AVG_TIME_IN_SYSTEM, Train.MAX_TIME_IN_SYSTEM, Train.HOG_OUT_COUNT.count(0), Train.HOG_OUT_COUNT.count(1), Train.HOG_OUT_COUNT.count(2))
+        # print(Train.HOG_OUT_TIME/dock.total_time)
+        data_list['Busy Percent'].append(busy_percent)
+        data_list['Idle Percent'].append(idle_percent)
+        data_list["Max Length"].append(max_length)
+        data_list["Avg Length"].append(avg_length)
+        data_list['Avg Wait Time'].append(avg_wait_time)
+        data_list['Max Time In System'].append(max_time_in_system)
+        data_list['Histogram'].append(histogram)
+        data_list["Hog Out Percent"].append(hog_out_time)
+        if l%10 == 0:
+            print(f"Finished {l +1} runs")
+        # data_list.append((data,data['Busy Time']/data["total time"],dock.length_data / dock.total_time, dock.total_time,
+        #                   Train.AVG_TIME_IN_SYSTEM, Train.MAX_TIME_IN_SYSTEM, Train.HOG_OUT_COUNT.count(0),
+        #                   Train.HOG_OUT_COUNT.count(1), Train.HOG_OUT_COUNT.count(2), Train.HOG_OUT_TIME/dock.total_time))
+        inter_train_time = data_list['Avg Wait Time']
+        mean, low, high = calc_CI(inter_train_time)
+        if (high - low) / mean < .01:
+            print(f"It took {l+1} runs to get to 1% width 99% Confidence Interval")
+            print(f"The CI is ({low}, {high})")
+            break
+        # print(low, high)
