@@ -79,11 +79,26 @@ def calc_CI(data, confidence=0.99):
     h = se * scipy.stats.t.ppf((1 + confidence) / 2., n-1)
     return m, m-h, m+h
 
-if __name__ == "__main__":
-
-    if sys.argv[1] != '-s':
-        MAX_ARRIVAL_TIME = float(sys.argv[2])
-        INTER_ARRIVAL = float(sys.argv[1])
+def main(test_inter = False):
+    if not test_inter:
+        if sys.argv[1] != '-s':
+            MAX_ARRIVAL_TIME = float(sys.argv[2])
+            INTER_ARRIVAL = float(sys.argv[1])
+            try:
+                LOOPS = int(sys.argv[3])
+            except IndexError as e:
+                print("Only one loop requested")
+                LOOPS = 1
+            FILE = False
+            start_time = 0
+        else:
+            train_times = sys.argv[2]
+            crew_times = sys.argv[3]
+            FILE = FileReader(train_times, crew_times)
+            start_time = FILE.get_next_train()
+    else:
+        MAX_ARRIVAL_TIME = 1e6
+        INTER_ARRIVAL = test_inter
         try:
             LOOPS = int(sys.argv[3])
         except IndexError as e:
@@ -91,13 +106,6 @@ if __name__ == "__main__":
             LOOPS = 1
         FILE = False
         start_time = 0
-    else:
-        # print('HERE')
-        # assert False, 'GOT INTO THE ELSE STATMENT'
-        train_times = sys.argv[2]
-        crew_times = sys.argv[3]
-        FILE = FileReader(train_times, crew_times)
-        start_time = FILE.get_next_train()
 
     data_list = defaultdict(list)
 
@@ -142,3 +150,15 @@ if __name__ == "__main__":
         data_list['Max Time In System'].append(max_time_in_system)
         data_list['Histogram'].append(histogram)
         data_list["Hog Out Percent"].append(hog_out_time)
+    if test_inter:
+        return data_list['Avg Wait Time'][0]
+
+def test_inter():
+    prev = defaultdict(int)
+    for i in range(50):
+        inter_time = 10 - i / 5
+        prev[inter_time] = main(inter_time)
+    print(prev)
+
+if __name__ == "__main__":
+    test_inter()
