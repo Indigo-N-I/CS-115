@@ -79,7 +79,10 @@ def calc_CI(data, confidence=0.99):
     h = se * scipy.stats.t.ppf((1 + confidence) / 2., n-1)
     return m, m-h, m+h
 
+
 def main(test_inter = False):
+
+
     if not test_inter:
         if sys.argv[1] != '-s':
             MAX_ARRIVAL_TIME = float(sys.argv[2])
@@ -97,6 +100,7 @@ def main(test_inter = False):
             FILE = FileReader(train_times, crew_times)
             start_time = FILE.get_next_train()
     else:
+        # just for testing overloading can be ignored normally
         MAX_ARRIVAL_TIME = 1e6
         INTER_ARRIVAL = test_inter
         try:
@@ -151,14 +155,18 @@ def main(test_inter = False):
         data_list['Histogram'].append(histogram)
         data_list["Hog Out Percent"].append(hog_out_time)
     if test_inter:
-        return data_list['Avg Wait Time'][0]
+        return data_list['Avg Wait Time'][0], busy_percent
 
+# just for testing when system overloads
 def test_inter():
     prev = defaultdict(int)
-    for i in range(50):
-        inter_time = 10 - i / 5
-        prev[inter_time] = main(inter_time)
+    inter_time = 10
+    while inter_time > 4:
+        prev[inter_time], busy = main(inter_time)
+        inter_time -= .2
+        if busy == 1:
+            break
     print(prev)
 
 if __name__ == "__main__":
-    main()
+    test_inter()
