@@ -161,4 +161,4 @@ def test_inter():
     print(prev)
 
 if __name__ == "__main__":
-    test_inter()
+    main()
